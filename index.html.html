@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scientific Calculator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 20% 20%, #1e293b, #0f172a 70%);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+  }
+
+  .calculator {
+    width: 100%;
+    max-width: 420px;
+    background: #1e293b;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .display {
+    background: #0f172a;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 18px;
+    text-align: right;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
+  .expression {
+    color: #64748b;
+    font-size: 1rem;
+    min-height: 22px;
+    word-wrap: break-word;
+    word-break: break-all;
+  }
+
+  .result {
+    color: #f8fafc;
+    font-size: 2.2rem;
+    font-weight: 600;
+    word-wrap: break-word;
+    word-break: break-all;
+    margin-top: 6px;
+  }
+
+  .result.error { color: #f87171; font-size: 1.4rem; }
+
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+
+  button {
+    border: none;
+    border-radius: 12px;
+    padding: 16px 0;
+    font-size: 1.05rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: #e2e8f0;
+    background: #334155;
+    transition: transform 0.08s ease, background 0.15s ease;
+    user-select: none;
+  }
+
+  button:hover { background: #475569; }
+  button:active { transform: scale(0.94); }
+
+  .fn { background: #1e3a5f; color: #93c5fd; font-size: 0.95rem; }
+  .fn:hover { background: #274b78; }
+
+  .op { background: #f59e0b; color: #1e293b; font-weight: 700; }
+  .op:hover { background: #fbbf24; }
+
+  .clear { background: #dc2626; color: #fff; }
+  .clear:hover { background: #ef4444; }
+
+  .equals { background: #10b981; color: #fff; font-weight: 700; }
+  .equals:hover { background: #34d399; }
+
+  .span2 { grid-column: span 2; }
+
+  .toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .toggle button {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    background: #1e3a5f;
+    color: #93c5fd;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="calculator">
+  <div class="toggle">
+    <button id="modeBtn">DEG</button>
+  </div>
+
+  <div class="display">
+    <div class="expression" id="expression"></div>
+    <div class="result" id="result">0</div>
+  </div>
+
+  <div class="keys" id="keys">
+    <!-- Row 1 -->
+    <button class="fn" data-fn="sin">sin</button>
+    <button class="fn" data-fn="cos">cos</button>
+    <button class="fn" data-fn="tan">tan</button>
+    <button class="fn" data-fn="log">log</button>
+    <button class="fn" data-fn="ln">ln</button>
+
+    <!-- Row 2 -->
+    <button class="fn" data-fn="sqrt">√</button>
+    <button class="fn" data-fn="sqr">x²</button>
+    <button class="fn" data-fn="pow">xʸ</button>
+    <button class="fn" data-fn="pi">π</button>
+    <button class="fn" data-fn="e">e</button>
+
+    <!-- Row 3 -->
+    <button class="fn" data-fn="(">(</button>
+    <button class="fn" data-fn=")">)</button>
+    <button class="fn" data-fn="fact">n!</button>
+    <button class="fn" data-fn="inv">1/x</button>
+    <button class="clear" data-action="clear">AC</button>
+
+    <!-- Row 4 -->
+    <button data-num="7">7</button>
+    <button data-num="8">8</button>
+    <button data-num="9">9</button>
+    <button class="op" data-op="/">÷</button>
+    <button class="clear" data-action="back">⌫</button>
+
+    <!-- Row 5 -->
+    <button data-num="4">4</button>
+    <button data-num="5">5</button>
+    <button data-num="6">6</button>
+    <button class="op" data-op="*">×</button>
+    <button class="fn" data-fn="exp">EXP</button>
+
+    <!-- Row 6 -->
+    <button data-num="1">1</button>
+    <button data-num="2">2</button>
+    <button data-num="3">3</button>
+    <button class="op" data-op="-">−</button>
+    <button class="fn" data-fn="sign">±</button>
+
+    <!-- Row 7 -->
+    <button data-num="0">0</button>
+    <button data-num=".">.</button>
+    <button class="op" data-op="+">+</button>
+    <button class="equals span2" data-action="equals">=</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const exprEl = document.getElementById('expression');
+  const resEl  = document.getElementById('result');
+  const keys   = document.getElementById('keys');
+  const modeBtn = document.getElementById('modeBtn');
+
+  let expression = '';      // raw internal expression
+  let displayExpr = '';     // pretty display
+  let isDegrees = true;
+  let justEvaluated = false;
+
+  const toRad = (x) => isDegrees ? x * Math.PI / 180 : x;
+  const toDeg = (x) => isDegrees ? x * 180 / Math.PI : x;
+
+  function updateDisplay() {
+    exprEl.textContent = displayExpr || '';
+    if (!justEvaluated) {
+      resEl.textContent = expression ? expression : '0';
+      resEl.classList.remove('error');
+    }
+  }
+
+  function factorial(n) {
+    if (n < 0 || !Number.isInteger(n)) return NaN;
+    if (n > 170) return Infinity;
+    let r = 1;
+    for (let i = 2; i <= n; i++) r *= i;
+    return r;
+  }
+
+  // Safely evaluate the expression string
+  function evaluate(expr) {
+    // Replace tokens with JS equivalents
+    let js = expr
+      .replace(/π/g, '(Math.PI)')
+      .replace(/\be\b/g, '(Math.E)')
+      .replace(/sin\(/g, `Math.sin(${isDegrees ? 'toRad(' : ''}`)
+      .replace(/cos\(/g, `Math.cos(${isDegrees ? 'toRad(' : ''}`)
+      .replace(/tan\(/g, `Math.tan(${isDegrees ? 'toRad(' : ''}`)
+      .replace(/asin\(/g, `toDeg(Math.asin(`)
+      .replace(/acos\(/g, `toDeg(Math.acos(`)
+      .replace(/atan\(/g, `toDeg(Math.atan(`)
+      .replace(/ln\(/g, 'Math.log(')
+      .replace(/log\(/g, 'Math.log10(')
+      .replace(/√\(/g, 'Math.sqrt(')
+      .replace(/\^/g, '**')
+      .replace(/%/g, '/100');
+
+    // Close the toRad wrapper for trig
+    if (isDegrees) {
+      js = js.replace(/toRad\((Math\.(sin|cos|tan)\([^)]*\))/g, (m, p1) => {
+        return p1; // handled below
+      });
+    }
+
+    // Simpler approach: build a function with custom trig
+    const fnBody = `
+      const toRad = ${toRad.toString()};
+      const toDeg = ${toDeg.toString()};
+      const sin = (x) => Math.sin(toRad(x));
+      const cos = (x) => Math.cos(toRad(x));
+      const tan = (x) => Math.tan(toRad(x));
+      const asin = (x) => toDeg(Math.asin(x));
+      const acos = (x) => toDeg(Math.acos(x));
+      const atan = (x) => toDeg(Math.atan(x));
+      const ln = Math.log;
+      const log = Math.log10;
+      const sqrt = Math.sqrt;
+      const fact = ${factorial.toString()};
+      return (${expr});
+    `;
+    return new Function(fnBody)();
+  }
+
+  function pressNumber(ch) {
+    if (justEvaluated) {
+      expression = '';
+      displayExpr = '';
+      justEvaluated = false;
+    }
+    expression += ch;
+    displayExpr += ch;
+    updateDisplay();
+  }
+
+  function pressOp(op) {
+    if (justEvaluated) {
+      expression = resEl.textContent;
+      displayExpr = resEl.textContent;
+      justEvaluated = false;
+    }
+    // prevent double operators
+    if (/[+\-*/^%]$/.test(expression) && /[+\-*/^%]/.test(op)) {
+      expression = expression.slice(0, -1) + op;
+      displayExpr = displayExpr.slice(0, -1) + op;
+    } else {
+      expression += op;
+      displayExpr += op;
+    }
+    updateDisplay();
+  }
+
+  function pressFn(fn) {
+    if (justEvaluated) {
+      expression = '';
+      displayExpr = '';
+      justEvaluated = false;
+    }
+    switch (fn) {
+      case 'sin': expression += 'sin('; displayExpr += 'sin('; break;
+      case 'cos': expression += 'cos('; displayExpr += 'cos('; break;
+      case 'tan': expression += 'tan('; displayExpr += 'tan('; break;
+      case 'log': expression += 'log('; displayExpr += 'log('; break;
+      case 'ln':  expression += 'ln(';  displayExpr += 'ln(';  break;
+      case 'sqrt': expression += '√(';  displayExpr += '√(';   break;
+      case 'sqr':
+        expression += '^2'; displayExpr += '²'; break;
+      case 'pow': expression += '^'; displayExpr += '^'; break;
+      case 'pi':  expression += 'π'; displayExpr += 'π'; break;
+      case 'e':   expression += 'e'; displayExpr += 'e'; break;
+      case '(':   expression += '('; displayExpr += '('; break;
+      case ')':   expression += ')'; displayExpr += ')'; break;
+      case 'fact': expression += '!'; displayExpr += '!'; break;
+      case 'inv':
+        expression = `1/(${expression})`;
+        displayExpr = `1/(${displayExpr})`;
+        break;
+      case 'exp': expression += 'E'; displayExpr += 'E'; break;
+      case 'sign':
+        if (expression.startsWith('-')) {
+          expression = expression.slice(1);
+          displayExpr = displayExpr.slice(1);
+        } else {
+          expression = '-' + expression;
+          displayExpr = '-' + displayExpr;
+        }
+        break;
+    }
+    updateDisplay();
+  }
+
+  function backspace() {
+    if (justEvaluated) {
+      justEvaluated = false;
+    }
+    expression = expression.slice(0, -1);
+    displayExpr = displayExpr.slice(0, -1);
+    updateDisplay();
+  }
+
+  function clearAll() {
+    expression = '';
+    displayExpr = '';
+    justEvaluated = false;
+    resEl.textContent = '0';
+    resEl.classList.remove('error');
+    updateDisplay();
+  }
+
+  function calculate() {
+    if (!expression) return;
+    // Pre-process factorial: replace n! with fact(n)
+    let expr = expression.replace(/(\d+(?:\.\d+)?)!/g, 'fact($1)');
+    // Replace E with *10^
+    expr = expr.replace(/E/g, '*10^');
+
+    try {
+      const result = evaluate(expr);
+      if (typeof result !== 'number' || !isFinite(result)) {
+        throw new Error('Math error');
+      }
+      const rounded = Math.round(result * 1e10) / 1e10;
+      resEl.textContent = rounded;
+      resEl.classList.remove('error');
+      expression = String(rounded);
+      displayExpr = String(rounded);
+      justEvaluated = true;
+    } catch (e) {
+      resEl.textContent = 'Error';
+      resEl.classList.add('error');
+      justEvaluated = true;
+      expression = '';
+      displayExpr = '';
+    }
+  }
+
+  // Event delegation
+  keys.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.num !== undefined) pressNumber(btn.dataset.num);
+    else if (btn.dataset.op) pressOp(btn.dataset.op);
+    else if (btn.dataset.fn) pressFn(btn.dataset.fn);
+    else if (btn.dataset.action === 'clear') clearAll();
+    else if (btn.dataset.action === 'back') backspace();
+    else if (btn.dataset.action === 'equals') calculate();
+  });
+
+  // Keyboard support
+  document.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (/[0-9.]/.test(k)) pressNumber(k);
+    else if (['+', '-', '*', '/'].includes(k)) pressOp(k);
+    else if (k === '^') pressFn('pow');
+    else if (k === '(' || k === ')') pressFn(k);
+    else if (k === 'Enter' || k === '=') { e.preventDefault(); calculate(); }
+    else if (k === 'Backspace') { e.preventDefault(); backspace(); }
+    else if (k === 'Escape') clearAll();
+    else if (k === 'p') pressFn('pi');
+    else if (k === 'e') pressFn('e');
+    else if (k === 'r') pressFn('sqrt');
+  });
+
+  // DEG / RAD toggle
+  modeBtn.addEventListener('click', () => {
+    isDegrees = !isDegrees;
+    modeBtn.textContent = isDegrees ? 'DEG' : 'RAD';
+  });
+
+  updateDisplay();
+})();
+</script>
+
+</body>
+</html>
